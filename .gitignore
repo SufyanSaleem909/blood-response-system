@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+mobile/build/
+mobile/.dart_tool/
+*.db
+.pytest_cache/
+*.egg-info/
+EOF
