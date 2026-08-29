@@ -92,3 +92,13 @@ See `docs/TROUBLESHOOTING.md` for real issues hit and resolved during developmen
 | Register | Post Request | Matches |
 |---|---|---|
 | ![register](docs/screenshots/register.png) | ![request](docs/screenshots/request.png) | ![matches](docs/screenshots/matches.png) |
+
+**Live demo:** Not yet deployed — see note below.
+
+## Running it locally
+
+This project runs via Docker Compose + Uvicorn locally (see setup instructions above).
+Live deployment is on the roadmap, pending a hosting provider that doesn't require
+payment details for a free-tier student/portfolio project. The backend is fully
+containerized and deploy-ready (Docker + Alembic migrations + env-based config),
+so standing it up on any PaaS is a configuration step away, not a code change.
