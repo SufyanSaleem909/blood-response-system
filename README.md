@@ -1,3 +1,5 @@
+![Backend CI](https://github.com/SufyanSaleem909/blood-response-system/actions/workflows/backend-ci.yml/badge.svg)
+
 # Blood Response System
 
 A cross-platform mobile app connecting urgent blood donation requesters with nearby, eligible donors in real time — built to close the gap between "blood is needed now" and "a matching donor nearby knows about it."
