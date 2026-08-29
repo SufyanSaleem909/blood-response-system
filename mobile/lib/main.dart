@@ -5,7 +5,7 @@ import 'package:geolocator/geolocator.dart';
 
 // Use 10.0.2.2 for Android emulator to reach your PC's localhost.
 // Use your PC's actual LAN IP if testing on a real phone.
-const String baseUrl = "192.168.100.53:8000";
+const String baseUrl = "http://192.168.100.53:8000";
 
 void main() => runApp(const BloodApp());
 
