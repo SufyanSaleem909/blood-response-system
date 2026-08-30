@@ -4,9 +4,13 @@ from sqlalchemy import text
 
 from app.db.session import get_db
 from app.api import users, blood_requests
+from app.api import users, blood_requests, responses
 
 app = FastAPI(title="Blood Response System API")
 
+app.include_router(users.router)
+app.include_router(blood_requests.router)
+app.include_router(responses.router)
 app.include_router(users.router)
 app.include_router(blood_requests.router)
 
