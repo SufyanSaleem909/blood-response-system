@@ -24,6 +24,7 @@ def create_user(payload: UserCreate, db: Session = Depends(get_db)):
         blood_type=payload.blood_type,
         last_donation_date=payload.last_donation_date,
         location=ST_SetSRID(ST_MakePoint(payload.longitude, payload.latitude), 4326),
+        fcm_token=payload.fcm_token,
     )
     db.add(new_user)
     db.commit()

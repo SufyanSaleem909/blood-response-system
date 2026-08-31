@@ -9,3 +9,4 @@ mobile/.dart_tool/
 .pytest_cache/
 *.egg-info/
 EOF
+firebase-credentials.json

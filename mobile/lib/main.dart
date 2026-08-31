@@ -2,12 +2,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'firebase_options.dart';
 
-// Use 10.0.2.2 for Android emulator to reach your PC's localhost.
-// Use your PC's actual LAN IP if testing on a real phone.
 const String baseUrl = "http://192.168.100.53:8000";
 
-void main() => runApp(const BloodApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const BloodApp());
+}
 
 class BloodApp extends StatelessWidget {
   const BloodApp({super.key});
@@ -37,12 +42,44 @@ class _HomeScreenState extends State<HomeScreen> {
   final bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
   bool isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    FirebaseMessaging.onMessage.listen((message) {
+      if (message.notification != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "${message.notification!.title}: ${message.notification!.body}",
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    super.dispose();
+  }
+
   Future<Position> _getLocation() async {
     LocationPermission perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
     return Geolocator.getCurrentPosition();
+  }
+
+  Future<String?> _getFcmToken() async {
+    try {
+      await FirebaseMessaging.instance.requestPermission();
+      return await FirebaseMessaging.instance.getToken();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _registerUser() async {
@@ -54,6 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => isLoading = true);
     try {
       final pos = await _getLocation();
+      final fcmToken = await _getFcmToken();
+
       final res = await http.post(
         Uri.parse("$baseUrl/users/"),
         headers: {"Content-Type": "application/json"},
@@ -63,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
           "blood_type": bloodType,
           "latitude": pos.latitude,
           "longitude": pos.longitude,
+          "fcm_token": fcmToken,
         }),
       );
 
@@ -81,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showSnack(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
@@ -200,9 +241,16 @@ class _RequestScreenState extends State<RequestScreen> {
   final bloodTypes = ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"];
 
   List<dynamic> matches = [];
-  Map<String, String> responsesState = {}; // Tracks donor_id -> status
+  Map<String, String> responsesState = {};
   String? currentRequestId;
   bool isSearching = false;
+
+  @override
+  void dispose() {
+    hospitalCtrl.dispose();
+    unitsCtrl.dispose();
+    super.dispose();
+  }
 
   Future<void> _submitRequest() async {
     if (hospitalCtrl.text.trim().isEmpty) {
@@ -241,7 +289,6 @@ class _RequestScreenState extends State<RequestScreen> {
         final data = jsonDecode(res.body);
         currentRequestId = data["id"];
 
-        // Fetch matched donors within geo-radius
         final matchRes = await http.get(
           Uri.parse("$baseUrl/blood-requests/$currentRequestId/matches"),
         );
@@ -305,6 +352,7 @@ class _RequestScreenState extends State<RequestScreen> {
   }
 
   void _showSnack(String msg) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 

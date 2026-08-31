@@ -12,6 +12,7 @@ class UserCreate(BaseModel):
     latitude: float
     longitude: float
     last_donation_date: Optional[date] = None
+    fcm_token: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -25,3 +26,4 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+

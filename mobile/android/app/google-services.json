@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "190821088244",
+    "project_id": "blood-response-system",
+    "storage_bucket": "blood-response-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:190821088244:android:d793cf9006e11d45a957a1",
+        "android_client_info": {
+          "package_name": "com.example.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7CdOWhU2i9fzFq8Szcfo4LJJoTQvSt6Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
