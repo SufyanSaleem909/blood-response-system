@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from geoalchemy2.functions import ST_SetSRID, ST_MakePoint
-
+from typing import Optional
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut
@@ -38,3 +38,11 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+@router.get("/", response_model=list[UserOut])
+def list_users(phone_number: Optional[str] = None, db: Session = Depends(get_db)):
+    query = select(User)
+    if phone_number:
+        query = query.where(User.phone_number == phone_number)
+    users = db.execute(query.order_by(User.created_at.desc()).limit(50)).scalars().all()
+    return users
