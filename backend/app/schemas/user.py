@@ -22,6 +22,7 @@ class UserOut(BaseModel):
     blood_type: str
     is_donor_available: bool
     last_donation_date: Optional[date] = None
+    fcm_token: Optional[str] = None
     created_at: datetime
 
     class Config:
