@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_screen.dart';
 
 const String baseUrl = "http://192.168.100.53:8000";
 
@@ -22,11 +24,14 @@ const List<String> kBloodTypes = [
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const BloodApp());
+  final prefs = await SharedPreferences.getInstance();
+  final storedToken = prefs.getString("access_token");
+  runApp(BloodApp(initialToken: storedToken));
 }
 
 class BloodApp extends StatelessWidget {
-  const BloodApp({super.key});
+  final String? initialToken;
+  const BloodApp({super.key, this.initialToken});
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +97,12 @@ class BloodApp extends StatelessWidget {
           titleMedium: TextStyle(fontWeight: FontWeight.w700),
         ),
       ),
-      home: const HomeScreen(),
+      home: initialToken != null
+          ? HomeScreen(token: initialToken!)
+          : AuthScreen(
+              onAuthenticated: (token, userId, phone) =>
+                  HomeScreen(token: token),
+            ),
     );
   }
 }
@@ -176,7 +186,8 @@ class LabeledField extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String token;
+  const HomeScreen({super.key, required this.token});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -185,6 +196,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String? userId;
   String? registeredName;
+  String token = "";
   final nameCtrl = TextEditingController();
   final phoneCtrl = TextEditingController();
   String bloodType = "O-";
@@ -193,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    token = widget.token;
     FirebaseMessaging.onMessage.listen((message) {
       if (message.notification != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -377,7 +390,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => RequestScreen(requesterId: userId!),
+                    builder: (_) =>
+                        RequestScreen(requesterId: userId!, token: token),
                   ),
                 ),
                 icon: const Icon(Icons.emergency),
@@ -467,7 +481,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class RequestScreen extends StatefulWidget {
   final String requesterId;
-  const RequestScreen({super.key, required this.requesterId});
+  final String token; // <--- Add token parameter
+
+  const RequestScreen({
+    super.key,
+    required this.requesterId,
+    required this.token, // <--- Require it in constructor
+  });
 
   @override
   State<RequestScreen> createState() => _RequestScreenState();
@@ -513,7 +533,10 @@ class _RequestScreenState extends State<RequestScreen> {
 
       final res = await http.post(
         Uri.parse("$baseUrl/blood-requests/"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${widget.token}",
+        },
         body: jsonEncode({
           "requester_id": widget.requesterId,
           "blood_type_needed": bloodType,
@@ -551,7 +574,10 @@ class _RequestScreenState extends State<RequestScreen> {
     try {
       final res = await http.post(
         Uri.parse("$baseUrl/blood-requests/$currentRequestId/respond"),
-        headers: {"Content-Type": "application/json"},
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${widget.token}",
+        },
         body: jsonEncode({"donor_id": donorId, "status": status}),
       );
       if (res.statusCode == 201) {
