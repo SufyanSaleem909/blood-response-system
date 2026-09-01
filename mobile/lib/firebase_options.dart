@@ -56,7 +56,6 @@ class DefaultFirebaseOptions {
     projectId: 'blood-response-system',
     storageBucket: 'blood-response-system.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyAjDTShssQ2uDVJB9JO--LIZ_nFmfnpwb0',
     appId: '1:190821088244:ios:9c9fd77bfdb8a8aca957a1',
@@ -65,7 +64,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'blood-response-system.firebasestorage.app',
     iosBundleId: 'com.example.mobile',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyAjDTShssQ2uDVJB9JO--LIZ_nFmfnpwb0',
     appId: '1:190821088244:ios:9c9fd77bfdb8a8aca957a1',

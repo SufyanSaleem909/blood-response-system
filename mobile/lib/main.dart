@@ -92,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final pos = await _getLocation();
       final fcmToken = await _getFcmToken();
+      print("FCM TOKEN: $fcmToken");
 
       final res = await http.post(
         Uri.parse("$baseUrl/users/"),
