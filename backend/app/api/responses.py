@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-
+from app.api.deps import get_current_user
+from app.models.user import User as UserModel
 from app.db.session import get_db
 from app.models.user import User
 from app.models.blood_request import BloodRequest
@@ -12,7 +13,15 @@ router = APIRouter(prefix="/blood-requests", tags=["responses"])
 
 
 @router.post("/{request_id}/respond", response_model=ResponseOut, status_code=201)
-def respond_to_request(request_id: str, payload: ResponseCreate, db: Session = Depends(get_db)):
+def respond_to_request(
+    request_id: str,
+    payload: ResponseCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    if str(current_user.id) != str(payload.donor_id):
+        raise HTTPException(status_code=403, detail="Cannot respond on behalf of another user")
+
     if payload.status not in ("accepted", "declined"):
         raise HTTPException(status_code=400, detail="status must be 'accepted' or 'declined'")
 

@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from geoalchemy2.functions import ST_SetSRID, ST_MakePoint
-
+from app.api.deps import get_current_user
+from app.models.user import User as UserModel
 from app.db.session import get_db
 from app.models.user import User
 from app.models.blood_request import BloodRequest
@@ -22,10 +23,18 @@ def is_eligible(last_donation_date: date | None) -> bool:
 
 
 @router.post("/", response_model=BloodRequestOut, status_code=201)
-def create_blood_request(payload: BloodRequestCreate, db: Session = Depends(get_db)):
+def create_blood_request(
+    payload: BloodRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    if str(current_user.id) != str(payload.requester_id):
+        raise HTTPException(status_code=403, detail="Cannot create a request on behalf of another user")
+
     requester = db.get(User, payload.requester_id)
     if not requester:
         raise HTTPException(status_code=404, detail="Requester not found")
+    ...  # rest of the function body stays exactly the same
 
     new_request = BloodRequest(
         requester_id=payload.requester_id,
