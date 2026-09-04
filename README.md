@@ -65,7 +65,12 @@ API docs available at `http://127.0.0.1:8000/docs` once the backend is running.
 - [x] Donor registration with blood type and location
 - [x] Urgent blood request creation
 - [x] Nearby-donor matching (blood type compatibility + 90-day eligibility + radius search)
-- [x] Minimal Flutter UI for the full flow above
+- [x] Push notifications (Firebase Cloud Messaging) to matched donors
+- [x] Donor accept/decline response tracking
+- [x] Phone-based OTP authentication (JWT) — protects request creation and
+      donor responses so users can't act on behalf of others. OTP delivery
+      logs to the backend console in dev mode (no paid SMS provider wired up).
+- [x] Minimal, polished Flutter UI for the full flow above
 
 ## Roadmap
 
@@ -102,3 +107,4 @@ Live deployment is on the roadmap, pending a hosting provider that doesn't requi
 payment details for a free-tier student/portfolio project. The backend is fully
 containerized and deploy-ready (Docker + Alembic migrations + env-based config),
 so standing it up on any PaaS is a configuration step away, not a code change.
+
