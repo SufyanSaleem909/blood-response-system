@@ -274,10 +274,17 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           userId = data["id"];
           registeredName = nameCtrl.text.trim();
+          if (data["access_token"] != null) {
+            token = data["access_token"];
+          }
         });
+
+        if (data["access_token"] != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString("access_token", data["access_token"]);
+        }
+
         _showSnack("You're registered as a $bloodType donor.");
-      } else {
-        _showSnack("Registration error: ${res.body}");
       }
     } catch (e) {
       _showSnack("Connection error: $e");
@@ -306,6 +313,27 @@ class _HomeScreenState extends State<HomeScreen> {
             Text("Blood Response"),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Log out",
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              if (!mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AuthScreen(
+                    onAuthenticated: (token, userId, phone) =>
+                        HomeScreen(token: token),
+                  ),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

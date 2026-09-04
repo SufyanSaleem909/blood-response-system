@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     last_donation_date: Optional[date] = None
     fcm_token: Optional[str] = None
     created_at: datetime
+    access_token: Optional[str] = None  # populated only on registration
 
     class Config:
         from_attributes = True
