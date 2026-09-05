@@ -1,13 +1,14 @@
 from datetime import date, timedelta
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
-from geoalchemy2.functions import ST_SetSRID, ST_MakePoint
+from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
+
 from app.api.deps import get_current_user
-from app.models.user import User as UserModel
 from app.db.session import get_db
-from app.models.user import User
 from app.models.blood_request import BloodRequest
+from app.models.user import User
 from app.schemas.blood_request import BloodRequestCreate, BloodRequestOut
 from app.services.matching import COMPATIBLE_DONORS
 from app.services.notifications import send_match_notification
@@ -26,15 +27,16 @@ def is_eligible(last_donation_date: date | None) -> bool:
 def create_blood_request(
     payload: BloodRequestCreate,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if str(current_user.id) != str(payload.requester_id):
-        raise HTTPException(status_code=403, detail="Cannot create a request on behalf of another user")
+        raise HTTPException(
+            status_code=403, detail="Cannot create a request on behalf of another user"
+        )
 
     requester = db.get(User, payload.requester_id)
     if not requester:
         raise HTTPException(status_code=404, detail="Requester not found")
-    ...  # rest of the function body stays exactly the same
 
     new_request = BloodRequest(
         requester_id=payload.requester_id,
@@ -48,7 +50,6 @@ def create_blood_request(
     db.commit()
     db.refresh(new_request)
 
-    # Push notifications to compatible, eligible nearby donors (within 10km)
     compatible_types = COMPATIBLE_DONORS.get(payload.blood_type_needed, [])
     query = text("""
         SELECT fcm_token, last_donation_date,
@@ -59,12 +60,15 @@ def create_blood_request(
           AND is_donor_available = TRUE
           AND ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, 10000)
     """)
-    rows = db.execute(query, {
-        "requester_id": payload.requester_id,
-        "lng": payload.longitude,
-        "lat": payload.latitude,
-        "compatible_types": compatible_types,
-    }).mappings().all()
+    rows = db.execute(
+        query,
+        {
+            "requester_id": payload.requester_id,
+            "lng": payload.longitude,
+            "lat": payload.latitude,
+            "compatible_types": compatible_types,
+        },
+    ).mappings().all()
 
     for row in rows:
         if is_eligible(row["last_donation_date"]):
@@ -76,6 +80,17 @@ def create_blood_request(
             )
 
     return new_request
+
+
+@router.get("/", response_model=list[BloodRequestOut])
+def list_blood_requests(status: Optional[str] = None, db: Session = Depends(get_db)):
+    query = select(BloodRequest)
+    if status:
+        query = query.where(BloodRequest.status == status)
+    requests = db.execute(
+        query.order_by(BloodRequest.created_at.desc()).limit(50)
+    ).scalars().all()
+    return requests
 
 
 @router.get("/{request_id}", response_model=BloodRequestOut)
@@ -105,21 +120,26 @@ def get_matches(request_id: str, radius_km: int = 10, db: Session = Depends(get_
         ORDER BY distance_km ASC
         LIMIT 50
     """)
-    rows = db.execute(query, {
-        "req_id": request_id,
-        "requester_id": req.requester_id,
-        "compatible_types": compatible_types,
-        "radius_m": radius_km * 1000,
-    }).mappings().all()
+    rows = db.execute(
+        query,
+        {
+            "req_id": request_id,
+            "requester_id": req.requester_id,
+            "compatible_types": compatible_types,
+            "radius_m": radius_km * 1000,
+        },
+    ).mappings().all()
 
     matches = [dict(r) for r in rows if is_eligible(r["last_donation_date"])]
     for m in matches:
         m["distance_km"] = round(m["distance_km"], 2)
         m["id"] = str(m["id"])
-        m["last_donation_date"] = str(m["last_donation_date"]) if m["last_donation_date"] else None
+        m["last_donation_date"] = (
+            str(m["last_donation_date"]) if m["last_donation_date"] else None
+        )
 
     return {
         "request_id": request_id,
         "blood_type_needed": req.blood_type_needed,
-        "matches": matches
+        "matches": matches,
     }
