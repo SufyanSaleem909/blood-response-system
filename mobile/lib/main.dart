@@ -764,80 +764,77 @@ class _RequestScreenState extends State<RequestScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Urgent Blood Request")),
-      body: Column(
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const LabeledField(label: "Hospital name"),
-                  TextField(controller: hospitalCtrl),
-                  const SizedBox(height: 16),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: 90,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const LabeledField(label: "Units"),
-                            TextField(
-                              controller: unitsCtrl,
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const LabeledField(label: "Blood type needed"),
-                            BloodTypePicker(
-                              value: bloodType,
-                              onChanged: (v) => setState(() => bloodType = v),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: scheme.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: isSearching ? null : _submitRequest,
-                      icon: isSearching
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(Icons.search),
-                      label: Text(
-                        isSearching ? "Searching..." : "Find Donors Near Me",
+          SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const LabeledField(label: "Hospital name"),
+                TextField(controller: hospitalCtrl),
+                const SizedBox(height: 16),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 90,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const LabeledField(label: "Units"),
+                          TextField(
+                            controller: unitsCtrl,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const LabeledField(label: "Blood type needed"),
+                          BloodTypePicker(
+                            value: bloodType,
+                            onChanged: (v) => setState(() => bloodType = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: scheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: isSearching ? null : _submitRequest,
+                    icon: isSearching
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.search),
+                    label: Text(
+                      isSearching ? "Searching..." : "Find Donors Near Me",
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-
-          if (currentRequestId != null)
+          if (currentRequestId != null) ...[
+            const SizedBox(height: 16),
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 color: Colors.amber.shade50,
@@ -861,187 +858,160 @@ class _RequestScreenState extends State<RequestScreen> {
                 ],
               ),
             ),
-
-          const SizedBox(height: 8),
-
-          Expanded(
-            child: !hasSearched
-                ? _EmptyState(
-                    icon: Icons.bloodtype_outlined,
-                    text:
-                        "Enter request details above and search for nearby donors.",
-                  )
-                : matches.isEmpty && !isSearching
-                ? _EmptyState(
-                    icon: Icons.search_off,
-                    text: "No eligible donors found nearby.",
-                  )
-                : Column(
-                    children: [
-                      if (hospitalLat != null && hospitalLng != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: SizedBox(
-                            height: 220,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: FlutterMap(
-                                options: MapOptions(
-                                  initialCenter: LatLng(
-                                    hospitalLat!,
-                                    hospitalLng!,
-                                  ),
-                                  initialZoom: 12,
-                                ),
-                                children: [
-                                  TileLayer(
-                                    urlTemplate:
-                                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                                    userAgentPackageName: 'com.example.mobile',
-                                  ),
-                                  MarkerLayer(
-                                    markers: [
-                                      Marker(
-                                        point: LatLng(
-                                          hospitalLat!,
-                                          hospitalLng!,
-                                        ),
-                                        width: 40,
-                                        height: 40,
-                                        child: const Icon(
-                                          Icons.local_hospital,
-                                          color: Colors.red,
-                                          size: 32,
-                                        ),
-                                      ),
-                                      ...matches.map(
-                                        (donor) => Marker(
-                                          point: LatLng(
-                                            donor["latitude"],
-                                            donor["longitude"],
-                                          ),
-                                          width: 36,
-                                          height: 36,
-                                          child: Icon(
-                                            Icons.bloodtype,
-                                            color: Colors.blue.shade700,
-                                            size: 28,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+          ],
+          if (hospitalLat != null && hospitalLng != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 220,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: LatLng(hospitalLat!, hospitalLng!),
+                    initialZoom: 12,
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.example.mobile',
+                    ),
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: LatLng(hospitalLat!, hospitalLng!),
+                          width: 40,
+                          height: 40,
+                          child: const Icon(
+                            Icons.local_hospital,
+                            color: Colors.red,
+                            size: 32,
+                          ),
+                        ),
+                        ...matches.map(
+                          (donor) => Marker(
+                            point: LatLng(
+                              donor["latitude"],
+                              donor["longitude"],
+                            ),
+                            width: 36,
+                            height: 36,
+                            child: Icon(
+                              Icons.bloodtype,
+                              color: Colors.blue.shade700,
+                              size: 28,
                             ),
                           ),
                         ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: matches.length,
-                          itemBuilder: (_, i) {
-                            final donor = matches[i];
-                            final donorId = donor["id"];
-                            final status = responsesState[donorId];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Card(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 22,
-                                        backgroundColor: scheme.primary
-                                            .withValues(alpha: 0.1),
-                                        child: Text(
-                                          donor["blood_type"] ?? "?",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            color: scheme.primary,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              donor["full_name"] ??
-                                                  "Anonymous Donor",
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              "${donor['distance_km']} km away · ${donor['phone_number']}",
-                                              style: TextStyle(
-                                                color: Colors.grey.shade600,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      if (status != null)
-                                        Chip(
-                                          avatar: Icon(
-                                            status == "accepted"
-                                                ? Icons.check_circle
-                                                : Icons.cancel,
-                                            color: status == "accepted"
-                                                ? Colors.green
-                                                : Colors.red,
-                                            size: 16,
-                                          ),
-                                          label: Text(
-                                            status.toUpperCase(),
-                                            style: const TextStyle(
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                          backgroundColor: Colors.grey.shade100,
-                                          side: BorderSide.none,
-                                        )
-                                      else
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.check_circle,
-                                                color: Colors.green,
-                                              ),
-                                              onPressed: () =>
-                                                  _respond(donorId, "accepted"),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.cancel,
-                                                color: Colors.red,
-                                              ),
-                                              onPressed: () =>
-                                                  _respond(donorId, "declined"),
-                                            ),
-                                          ],
-                                        ),
-                                    ],
-                                  ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (!hasSearched)
+            _EmptyState(
+              icon: Icons.bloodtype_outlined,
+              text: "Enter request details above and search for nearby donors.",
+            )
+          else if (matches.isEmpty && !isSearching)
+            _EmptyState(
+              icon: Icons.search_off,
+              text: "No eligible donors found nearby.",
+            )
+          else
+            ...matches.map((donor) {
+              final donorId = donor["id"];
+              final status = responsesState[donorId];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: scheme.primary.withValues(
+                            alpha: 0.1,
+                          ),
+                          child: Text(
+                            donor["blood_type"] ?? "?",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: scheme.primary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                donor["full_name"] ?? "Anonymous Donor",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            );
-                          },
+                              const SizedBox(height: 2),
+                              Text(
+                                "${donor['distance_km']} km away · ${donor['phone_number']}",
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                        if (status != null)
+                          Chip(
+                            avatar: Icon(
+                              status == "accepted"
+                                  ? Icons.check_circle
+                                  : Icons.cancel,
+                              color: status == "accepted"
+                                  ? Colors.green
+                                  : Colors.red,
+                              size: 16,
+                            ),
+                            label: Text(
+                              status.toUpperCase(),
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                            backgroundColor: Colors.grey.shade100,
+                            side: BorderSide.none,
+                          )
+                        else
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                ),
+                                onPressed: () => _respond(donorId, "accepted"),
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.cancel,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () => _respond(donorId, "declined"),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
-          ),
+                ),
+              );
+            }),
         ],
       ),
     );
