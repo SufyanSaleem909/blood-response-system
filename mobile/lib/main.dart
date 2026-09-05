@@ -185,6 +185,9 @@ class LabeledField extends StatelessWidget {
 // Home / Registration screen
 // ---------------------------------------------------------------------------
 
+// Ensure your constants and auxiliary widgets are imported or defined:
+// const String baseUrl = "http://127.0.0.1:8000";
+
 class HomeScreen extends StatefulWidget {
   final String token;
   const HomeScreen({super.key, required this.token});
@@ -202,10 +205,16 @@ class _HomeScreenState extends State<HomeScreen> {
   String bloodType = "O-";
   bool isLoading = false;
 
+  // Donor availability state
+  bool isDonorAvailable = true;
+  bool availabilityLoading = false;
+
   @override
   void initState() {
     super.initState();
     token = widget.token;
+    _fetchMe();
+
     FirebaseMessaging.onMessage.listen((message) {
       if (message.notification != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -226,6 +235,52 @@ class _HomeScreenState extends State<HomeScreen> {
     nameCtrl.dispose();
     phoneCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchMe() async {
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/users/me"),
+        headers: {"Authorization": "Bearer $token"},
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          userId = data["id"];
+          registeredName = data["full_name"];
+          bloodType = data["blood_type"];
+          isDonorAvailable = data["is_donor_available"] ?? true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleAvailability(bool value) async {
+    setState(() => availabilityLoading = true);
+    try {
+      final res = await http.patch(
+        Uri.parse("$baseUrl/users/me/availability"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"is_donor_available": value}),
+      );
+      if (res.statusCode == 200) {
+        setState(() => isDonorAvailable = value);
+        _showSnack(
+          value
+              ? "You're marked as available to donate."
+              : "You're paused — you won't be notified.",
+        );
+      } else {
+        _showSnack("Failed to update availability: ${res.body}");
+      }
+    } catch (e) {
+      _showSnack("Connection error: $e");
+    } finally {
+      setState(() => availabilityLoading = false);
+    }
   }
 
   Future<Position> _getLocation() async {
@@ -274,6 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           userId = data["id"];
           registeredName = nameCtrl.text.trim();
+          isDonorAvailable = data["is_donor_available"] ?? true;
           if (data["access_token"] != null) {
             token = data["access_token"];
           }
@@ -377,6 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 20),
 
           if (userId != null) ...[
+            // Registered User Details Card
             SectionCard(
               child: Row(
                 children: [
@@ -407,7 +464,54 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+
+            // Availability Toggle Switch Card
+            SectionCard(
+              child: Row(
+                children: [
+                  Icon(
+                    isDonorAvailable
+                        ? Icons.notifications_active
+                        : Icons.notifications_off,
+                    color: isDonorAvailable ? Colors.green : Colors.grey,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Available to donate",
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        Text(
+                          isDonorAvailable
+                              ? "You'll be notified of nearby matching requests."
+                              : "Paused — you won't receive notifications.",
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  availabilityLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Switch(
+                          value: isDonorAvailable,
+                          onChanged: _toggleAvailability,
+                        ),
+                ],
+              ),
+            ),
             const SizedBox(height: 20),
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
