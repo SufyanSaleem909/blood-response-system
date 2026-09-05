@@ -111,6 +111,8 @@ def get_matches(request_id: str, radius_km: int = 10, db: Session = Depends(get_
 
     query = text("""
         SELECT id, full_name, phone_number, blood_type, last_donation_date,
+               ST_Y(location::geometry) AS latitude,
+               ST_X(location::geometry) AS longitude,
                ST_Distance(location::geography, (SELECT location::geography FROM blood_requests WHERE id = :req_id)) / 1000 AS distance_km
         FROM users
         WHERE id != :requester_id
@@ -138,8 +140,18 @@ def get_matches(request_id: str, radius_km: int = 10, db: Session = Depends(get_
             str(m["last_donation_date"]) if m["last_donation_date"] else None
         )
 
+    hospital_coords = db.execute(
+        text("SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng FROM blood_requests WHERE id = :req_id"),
+        {"req_id": request_id}
+    ).mappings().first()
+
     return {
         "request_id": request_id,
         "blood_type_needed": req.blood_type_needed,
+        "hospital_name": req.hospital_name,
+        "hospital_location": {
+            "latitude": hospital_coords["lat"] if hospital_coords else None,
+            "longitude": hospital_coords["lng"] if hospital_coords else None,
+        },
         "matches": matches,
     }
