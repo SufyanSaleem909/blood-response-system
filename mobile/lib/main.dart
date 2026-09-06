@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'history_screen.dart';
 
 const String baseUrl = "http://192.168.100.53:8000";
 
@@ -372,6 +373,14 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: "My activity",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => HistoryScreen(token: token)),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: "Log out",
