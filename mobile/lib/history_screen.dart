@@ -79,6 +79,13 @@ class _HistoryScreenState extends State<HistoryScreen>
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
           tabs: const [
             Tab(text: "My Requests"),
             Tab(text: "My Donations"),

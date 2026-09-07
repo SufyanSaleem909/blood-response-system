@@ -10,6 +10,7 @@ import 'auth_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'history_screen.dart';
+import 'nearby_requests_screen.dart';
 
 const String baseUrl = "http://192.168.100.53:8000";
 
@@ -539,6 +540,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 icon: const Icon(Icons.emergency),
                 label: const Text("Post an Urgent Blood Request"),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        NearbyRequestsScreen(token: token, donorId: userId!),
+                  ),
+                ),
+                icon: const Icon(Icons.volunteer_activism),
+                label: const Text("Browse Nearby Requests"),
               ),
             ),
             const SizedBox(height: 24),
