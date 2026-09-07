@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
@@ -8,12 +9,18 @@ from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.blood_request import BloodRequest
+from app.models.response import Response
 from app.models.user import User
 from app.schemas.blood_request import BloodRequestCreate, BloodRequestOut
+from app.schemas.response import ResponseOut
 from app.services.matching import COMPATIBLE_DONORS
 from app.services.notifications import send_match_notification
 
 router = APIRouter(prefix="/blood-requests", tags=["blood-requests"])
+
+
+class StatusUpdate(BaseModel):
+    status: str  # "fulfilled" or "cancelled"
 
 
 def is_eligible(last_donation_date: date | None) -> bool:
@@ -93,6 +100,87 @@ def list_blood_requests(status: Optional[str] = None, db: Session = Depends(get_
     return requests
 
 
+@router.get("/mine/requests", response_model=list[BloodRequestOut])
+def my_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    requests = db.execute(
+        select(BloodRequest)
+        .where(BloodRequest.requester_id == current_user.id)
+        .order_by(BloodRequest.created_at.desc())
+    ).scalars().all()
+    return requests
+
+
+@router.get("/mine/responses", response_model=list[ResponseOut])
+def my_responses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    responses = db.execute(
+        select(Response)
+        .where(Response.donor_id == current_user.id)
+        .order_by(Response.responded_at.desc())
+    ).scalars().all()
+    return responses
+
+
+@router.get("/nearby/for-donor")
+def nearby_requests_for_donor(
+    radius_km: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Which "needed" blood types can this donor's blood type satisfy?
+    compatible_needed_types = [
+        needed for needed, donor_types in COMPATIBLE_DONORS.items()
+        if current_user.blood_type in donor_types
+    ]
+
+    donor_location = db.execute(
+        text("SELECT location::geography FROM users WHERE id = :donor_id"),
+        {"donor_id": current_user.id}
+    ).scalar()
+
+    if donor_location is None:
+        return {"requests": []}
+
+    query = text("""
+        SELECT br.id, br.blood_type_needed, br.units_needed, br.hospital_name,
+               br.urgency, br.status, br.created_at,
+               ST_Distance(br.location::geography, :donor_location::geography) / 1000 AS distance_km,
+               EXISTS (
+                   SELECT 1 FROM responses r
+                   WHERE r.request_id = br.id AND r.donor_id = :donor_id
+               ) AS already_responded
+        FROM blood_requests br
+        WHERE br.status = 'open'
+          AND br.requester_id != :donor_id
+          AND br.blood_type_needed = ANY(:compatible_needed_types)
+          AND ST_DWithin(br.location::geography, :donor_location::geography, :radius_m)
+        ORDER BY distance_km ASC
+        LIMIT 50
+    """)
+
+    rows = db.execute(query, {
+        "donor_location": donor_location,
+        "donor_id": current_user.id,
+        "compatible_needed_types": compatible_needed_types,
+        "radius_m": radius_km * 1000,
+    }).mappings().all()
+
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["id"] = str(d["id"])
+        d["distance_km"] = round(d["distance_km"], 2)
+        d["created_at"] = str(d["created_at"])
+        results.append(d)
+
+    return {"requests": results}
+
+
 @router.get("/{request_id}", response_model=BloodRequestOut)
 def get_blood_request(request_id: str, db: Session = Depends(get_db)):
     req = db.get(BloodRequest, request_id)
@@ -155,3 +243,26 @@ def get_matches(request_id: str, radius_km: int = 10, db: Session = Depends(get_
         },
         "matches": matches,
     }
+
+
+@router.patch("/{request_id}/status", response_model=BloodRequestOut)
+def update_request_status(
+    request_id: str,
+    payload: StatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if payload.status not in ("fulfilled", "cancelled"):
+        raise HTTPException(status_code=400, detail="status must be 'fulfilled' or 'cancelled'")
+
+    req = db.get(BloodRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Blood request not found")
+
+    if str(req.requester_id) != str(current_user.id):
+        raise HTTPException(status_code=403, detail="Only the requester can update this request's status")
+
+    req.status = payload.status
+    db.commit()
+    db.refresh(req)
+    return req
