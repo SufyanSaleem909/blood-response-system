@@ -138,18 +138,19 @@ def nearby_requests_for_donor(
         if current_user.blood_type in donor_types
     ]
 
-    donor_location = db.execute(
-        text("SELECT location::geography FROM users WHERE id = :donor_id"),
+    # Retrieve donor coordinates directly
+    coords = db.execute(
+        text("SELECT ST_X(location::geometry) AS lng, ST_Y(location::geometry) AS lat FROM users WHERE id = :donor_id"),
         {"donor_id": current_user.id}
-    ).scalar()
+    ).mappings().first()
 
-    if donor_location is None:
+    if not coords or coords["lng"] is None or coords["lat"] is None:
         return {"requests": []}
 
     query = text("""
         SELECT br.id, br.blood_type_needed, br.units_needed, br.hospital_name,
                br.urgency, br.status, br.created_at,
-               ST_Distance(br.location::geography, :donor_location::geography) / 1000 AS distance_km,
+               ST_Distance(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) / 1000 AS distance_km,
                EXISTS (
                    SELECT 1 FROM responses r
                    WHERE r.request_id = br.id AND r.donor_id = :donor_id
@@ -158,14 +159,15 @@ def nearby_requests_for_donor(
         WHERE br.status = 'open'
           AND br.requester_id != :donor_id
           AND br.blood_type_needed = ANY(:compatible_needed_types)
-          AND ST_DWithin(br.location::geography, :donor_location::geography, :radius_m)
+          AND ST_DWithin(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
         ORDER BY distance_km ASC
         LIMIT 50
     """)
 
     rows = db.execute(query, {
-        "donor_location": donor_location,
         "donor_id": current_user.id,
+        "lng": coords["lng"],
+        "lat": coords["lat"],
         "compatible_needed_types": compatible_needed_types,
         "radius_m": radius_km * 1000,
     }).mappings().all()
