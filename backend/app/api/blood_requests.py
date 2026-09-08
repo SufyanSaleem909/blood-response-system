@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,6 +18,12 @@ from app.services.notifications import send_match_notification
 
 router = APIRouter(prefix="/blood-requests", tags=["blood-requests"])
 
+URGENCY_EXPIRY_HOURS = {
+    "critical": 6,
+    "urgent": 24,
+    "planned": 72,
+}
+
 
 class StatusUpdate(BaseModel):
     status: str  # "fulfilled" or "cancelled"
@@ -28,6 +34,20 @@ def is_eligible(last_donation_date: date | None) -> bool:
     if last_donation_date is None:
         return True
     return date.today() >= last_donation_date + timedelta(days=90)
+
+
+def _apply_lazy_expiry(req: BloodRequest, db: Session) -> BloodRequest:
+    """If a request's expiry has passed but it's still marked open, flip it
+    to expired now. Avoids needing a background scheduler for this MVP."""
+    if (
+        req.status == "open"
+        and req.expires_at
+        and datetime.now(timezone.utc) > req.expires_at.replace(tzinfo=timezone.utc)
+    ):
+        req.status = "expired"
+        db.commit()
+        db.refresh(req)
+    return req
 
 
 @router.post("/", response_model=BloodRequestOut, status_code=201)
@@ -45,12 +65,15 @@ def create_blood_request(
     if not requester:
         raise HTTPException(status_code=404, detail="Requester not found")
 
+    expiry_hours = URGENCY_EXPIRY_HOURS.get(payload.urgency, 24)
+
     new_request = BloodRequest(
         requester_id=payload.requester_id,
         blood_type_needed=payload.blood_type_needed,
         units_needed=payload.units_needed,
         hospital_name=payload.hospital_name,
         urgency=payload.urgency,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=expiry_hours),
         location=ST_SetSRID(ST_MakePoint(payload.longitude, payload.latitude), 4326),
     )
     db.add(new_request)
@@ -95,6 +118,7 @@ def create_blood_request(
 
     return new_request
 
+
 @router.get("/", response_model=list[BloodRequestOut])
 def list_blood_requests(status: Optional[str] = None, db: Session = Depends(get_db)):
     query = select(BloodRequest)
@@ -103,7 +127,7 @@ def list_blood_requests(status: Optional[str] = None, db: Session = Depends(get_
     requests = db.execute(
         query.order_by(BloodRequest.created_at.desc()).limit(50)
     ).scalars().all()
-    return requests
+    return [_apply_lazy_expiry(r, db) for r in requests]
 
 
 @router.get("/mine/requests", response_model=list[BloodRequestOut])
@@ -116,7 +140,7 @@ def my_requests(
         .where(BloodRequest.requester_id == current_user.id)
         .order_by(BloodRequest.created_at.desc())
     ).scalars().all()
-    return requests
+    return [_apply_lazy_expiry(r, db) for r in requests]
 
 
 @router.get("/mine/responses", response_model=list[ResponseOut])
@@ -138,13 +162,11 @@ def nearby_requests_for_donor(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Which "needed" blood types can this donor's blood type satisfy?
     compatible_needed_types = [
         needed for needed, donor_types in COMPATIBLE_DONORS.items()
         if current_user.blood_type in donor_types
     ]
 
-    # Retrieve donor coordinates directly
     coords = db.execute(
         text("SELECT ST_X(location::geometry) AS lng, ST_Y(location::geometry) AS lat FROM users WHERE id = :donor_id"),
         {"donor_id": current_user.id}
@@ -155,7 +177,7 @@ def nearby_requests_for_donor(
 
     query = text("""
         SELECT br.id, br.blood_type_needed, br.units_needed, br.hospital_name,
-               br.urgency, br.status, br.created_at,
+               br.urgency, br.status, br.created_at, br.expires_at,
                ST_Distance(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) / 1000 AS distance_km,
                EXISTS (
                    SELECT 1 FROM responses r
@@ -163,6 +185,7 @@ def nearby_requests_for_donor(
                ) AS already_responded
         FROM blood_requests br
         WHERE br.status = 'open'
+          AND (br.expires_at IS NULL OR br.expires_at > NOW())
           AND br.requester_id != :donor_id
           AND br.blood_type_needed = ANY(:compatible_needed_types)
           AND ST_DWithin(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
@@ -184,6 +207,7 @@ def nearby_requests_for_donor(
         d["id"] = str(d["id"])
         d["distance_km"] = round(d["distance_km"], 2)
         d["created_at"] = str(d["created_at"])
+        d["expires_at"] = str(d["expires_at"]) if d["expires_at"] else None
         results.append(d)
 
     return {"requests": results}
@@ -194,7 +218,7 @@ def get_blood_request(request_id: str, db: Session = Depends(get_db)):
     req = db.get(BloodRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Blood request not found")
-    return req
+    return _apply_lazy_expiry(req, db)
 
 
 @router.get("/{request_id}/matches")
@@ -202,6 +226,15 @@ def get_matches(request_id: str, radius_km: int = 10, db: Session = Depends(get_
     req = db.get(BloodRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Blood request not found")
+
+    req = _apply_lazy_expiry(req, db)
+    if req.status != "open":
+        return {
+            "request_id": request_id,
+            "blood_type_needed": req.blood_type_needed,
+            "matches": [],
+            "status": req.status,
+        }
 
     compatible_types = COMPATIBLE_DONORS.get(req.blood_type_needed, [])
 
