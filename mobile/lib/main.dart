@@ -25,6 +25,8 @@ const List<String> kBloodTypes = [
   "AB+",
 ];
 
+final navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -45,6 +47,7 @@ class BloodApp extends StatelessWidget {
     );
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Blood Response System',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -219,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
     token = widget.token;
     _fetchMe();
 
+    // 1. Foreground Notification Toast
     FirebaseMessaging.onMessage.listen((message) {
       if (message.notification != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -232,6 +236,34 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     });
+
+    // 2. Background Notification Tap (App minimized/alive in memory)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+      await _navigateToNearbyWhenReady();
+    });
+
+    // 3. Cold Start Notification Tap (App fully terminated)
+    FirebaseMessaging.instance.getInitialMessage().then((
+      RemoteMessage? message,
+    ) async {
+      if (message != null) {
+        await _navigateToNearbyWhenReady();
+      }
+    });
+  }
+
+  // Helper method to await user profile loading before navigating
+  Future<void> _navigateToNearbyWhenReady() async {
+    for (int i = 0; i < 10 && userId == null; i++) {
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+    if (userId != null && navigatorKey.currentState != null) {
+      navigatorKey.currentState!.push(
+        MaterialPageRoute(
+          builder: (_) => NearbyRequestsScreen(token: token, donorId: userId!),
+        ),
+      );
+    }
   }
 
   @override
