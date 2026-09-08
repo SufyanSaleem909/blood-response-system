@@ -51,7 +51,9 @@ class _HistoryScreenState extends State<HistoryScreen>
       });
     } catch (_) {
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -65,6 +67,23 @@ class _HistoryScreenState extends State<HistoryScreen>
       body: jsonEncode({"status": "fulfilled"}),
     );
     if (res.statusCode == 200) {
+      _loadHistory();
+    }
+  }
+
+  Future<void> _markDonated() async {
+    final res = await http.patch(
+      Uri.parse("$baseUrl/users/me/mark-donated"),
+      headers: {"Authorization": "Bearer ${widget.token}"},
+    );
+    if (res.statusCode == 200 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Thank you — marked as donated. Your 90-day eligibility timer has restarted.",
+          ),
+        ),
+      );
       _loadHistory();
     }
   }
@@ -185,6 +204,12 @@ class _HistoryScreenState extends State<HistoryScreen>
                 "Request ${r['request_id'].toString().substring(0, 8)}...",
               ),
               subtitle: Text(r["status"].toString().toUpperCase()),
+              trailing: r["status"] == "accepted"
+                  ? TextButton(
+                      onPressed: _markDonated,
+                      child: const Text("I donated"),
+                    )
+                  : null,
             ),
           );
         },
