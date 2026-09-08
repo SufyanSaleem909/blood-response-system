@@ -25,6 +25,26 @@ const List<String> kBloodTypes = [
   "AB+",
 ];
 
+const List<String> kKnownHospitals = [
+  "Aga Khan University Hospital, Karachi",
+  "Jinnah Postgraduate Medical Centre, Karachi",
+  "Liaquat National Hospital, Karachi",
+  "Civil Hospital Karachi",
+  "South City Hospital, Karachi",
+  "Shifa International Hospital, Islamabad",
+  "Pakistan Institute of Medical Sciences (PIMS), Islamabad",
+  "Holy Family Hospital, Rawalpindi",
+  "Combined Military Hospital (CMH), Rawalpindi",
+  "Services Hospital, Lahore",
+  "Mayo Hospital, Lahore",
+  "Jinnah Hospital, Lahore",
+  "Shaukat Khanum Memorial Cancer Hospital, Lahore",
+  "Nishtar Hospital, Multan",
+  "Lady Reading Hospital, Peshawar",
+  "Hayatabad Medical Complex, Peshawar",
+  "Ghurki Trust Teaching Hospital, Lahore",
+];
+
 final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
@@ -829,7 +849,64 @@ class _RequestScreenState extends State<RequestScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const LabeledField(label: "Hospital name"),
-                TextField(controller: hospitalCtrl),
+                Autocomplete<String>(
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return const Iterable<String>.empty();
+                    }
+                    return kKnownHospitals.where(
+                      (h) => h.toLowerCase().contains(
+                        textEditingValue.text.toLowerCase(),
+                      ),
+                    );
+                  },
+                  onSelected: (String selection) {
+                    hospitalCtrl.text = selection;
+                  },
+                  fieldViewBuilder:
+                      (context, controller, focusNode, onFieldSubmitted) {
+                        // Keep our own controller in sync so free typing (not just selecting
+                        // a suggestion) still updates hospitalCtrl for submission.
+                        controller.addListener(() {
+                          hospitalCtrl.text = controller.text;
+                        });
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          decoration: const InputDecoration(
+                            hintText: "Start typing a hospital name...",
+                          ),
+                        );
+                      },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(12),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final option = options.elementAt(index);
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  option,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
