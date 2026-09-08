@@ -77,17 +77,23 @@ def create_blood_request(
         },
     ).mappings().all()
 
+    seen_tokens = set()
     for row in rows:
+        token = row["fcm_token"]
+        if not token or token in seen_tokens:
+            continue
+
+        seen_tokens.add(token)
+
         if is_eligible(row["last_donation_date"]):
             send_match_notification(
-                fcm_token=row["fcm_token"],
+                fcm_token=token,
                 blood_type=payload.blood_type_needed,
                 hospital_name=payload.hospital_name,
                 distance_km=round(row["distance_km"], 2),
             )
 
     return new_request
-
 
 @router.get("/", response_model=list[BloodRequestOut])
 def list_blood_requests(status: Optional[str] = None, db: Session = Depends(get_db)):
