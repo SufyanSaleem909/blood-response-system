@@ -71,6 +71,16 @@ API docs available at `http://127.0.0.1:8000/docs` once the backend is running.
       donor responses so users can't act on behalf of others. OTP delivery
       logs to the backend console in dev mode (no paid SMS provider wired up).
 - [x] Minimal, polished Flutter UI for the full flow above
+- [x] Two-way notifications: donors are notified of matching requests,
+      and requesters are notified the moment a donor accepts.
+- [x] Donor availability toggle — donors can pause/resume matching without
+      deleting their account, addressing the "is my donation actually
+      needed right now" problem from the original user research.
+- [x] Request lifecycle management — requesters can mark requests as
+      fulfilled/cancelled; both requesters and donors can view their
+      own request/response history.
+- [x] OTP security hardening — resend cooldown, max verification attempts,
+      and automatic invalidation of previous codes when a new one is issued.
 
 ## Roadmap
 

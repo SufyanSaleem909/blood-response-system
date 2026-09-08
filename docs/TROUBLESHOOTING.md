@@ -26,3 +26,22 @@ only tables present in our own SQLAlchemy metadata (`target_metadata.tables`),
 ignoring everything else in the database regardless of name. This is more
 robust than maintaining an exclude-list, since PostGIS's exact table set
 varies by version/extension.
+
+## FlutterFire + Gradle version conflicts
+
+Running `flutterfire configure` on an Android folder that was scaffolded
+by an older Flutter version (or had manual Gradle edits) can produce
+version conflicts, duplicate plugins blocks, or plugin resolution
+failures that are hard to fix incrementally. The reliable fix: delete
+`android/`, run `flutter create --platforms=android .` to regenerate it
+matching the current Flutter SDK, reapply any manual manifest changes
+(permissions etc.), then re-run `flutterfire configure` on the clean folder.
+
+## Cannot pass a PostGIS geography value as a bound SQL parameter
+
+Passing a `geography`/`geometry` result (fetched via `db.execute(...).scalar()`)
+directly as a bound parameter in a later raw SQL query causes a syntax error —
+psycopg2/SQLAlchemy can't serialize that Python object back into SQL. Instead,
+fetch/pass plain `latitude`/`longitude` floats and reconstruct the point inside
+the query with `ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography`, matching
+the pattern used elsewhere (create_blood_request, get_matches).
