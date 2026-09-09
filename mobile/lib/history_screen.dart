@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'main.dart'; // for RequestResultsScreen
 
-const String baseUrl = "http://192.168.100.53:8000"; // match main.dart
+const String baseUrl = "http://192.168.100.53:8000";
 
 class HistoryScreen extends StatefulWidget {
   final String token;
@@ -143,6 +144,22 @@ class _HistoryScreenState extends State<HistoryScreen>
           return Card(
             margin: const EdgeInsets.only(bottom: 10),
             child: ListTile(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RequestResultsScreen(
+                      requestId: r["id"],
+                      hospitalName: r["hospital_name"],
+                      bloodTypeNeeded: r["blood_type_needed"],
+                      unitsNeeded: r["units_needed"],
+                      createdAt: r["created_at"],
+                      expiresAt: r["expires_at"],
+                      token: widget.token,
+                    ),
+                  ),
+                );
+              },
               leading: CircleAvatar(
                 backgroundColor: scheme.primary.withValues(alpha: 0.1),
                 child: Text(
