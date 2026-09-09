@@ -587,7 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        RequestScreen(requesterId: userId!, token: token),
+                        CreateRequestScreen(requesterId: userId!, token: token),
                   ),
                 ),
                 icon: const Icon(Icons.emergency),
@@ -690,33 +690,25 @@ class _HomeScreenState extends State<HomeScreen> {
 // Blood request + matches screen
 // ---------------------------------------------------------------------------
 
-class RequestScreen extends StatefulWidget {
+class CreateRequestScreen extends StatefulWidget {
   final String requesterId;
   final String token;
-
-  const RequestScreen({
+  const CreateRequestScreen({
     super.key,
     required this.requesterId,
     required this.token,
   });
 
   @override
-  State<RequestScreen> createState() => _RequestScreenState();
+  State<CreateRequestScreen> createState() => _CreateRequestScreenState();
 }
 
-class _RequestScreenState extends State<RequestScreen> {
+class _CreateRequestScreenState extends State<CreateRequestScreen> {
   final hospitalCtrl = TextEditingController();
   final unitsCtrl = TextEditingController(text: "1");
   String bloodType = "O-";
-
-  List<dynamic> matches = [];
-  Map<String, String> responsesState = {};
-  String? currentRequestId;
-  bool isSearching = false;
-  bool hasSearched = false;
-
-  double? hospitalLat;
-  double? hospitalLng;
+  String urgency = "critical";
+  bool isSubmitting = false;
 
   @override
   void dispose() {
@@ -731,15 +723,7 @@ class _RequestScreenState extends State<RequestScreen> {
       return;
     }
 
-    setState(() {
-      isSearching = true;
-      hasSearched = true;
-      matches.clear();
-      responsesState.clear();
-      hospitalLat = null;
-      hospitalLng = null;
-    });
-
+    setState(() => isSubmitting = true);
     try {
       LocationPermission perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) {
@@ -760,72 +744,35 @@ class _RequestScreenState extends State<RequestScreen> {
           "hospital_name": hospitalCtrl.text.trim(),
           "latitude": pos.latitude,
           "longitude": pos.longitude,
-          "urgency": "critical",
+          "urgency": urgency,
         }),
       );
 
       if (res.statusCode == 201) {
         final data = jsonDecode(res.body);
-        currentRequestId = data["id"];
-
-        final matchRes = await http.get(
-          Uri.parse("$baseUrl/blood-requests/$currentRequestId/matches"),
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => RequestResultsScreen(
+              requestId: data["id"],
+              hospitalName: data["hospital_name"],
+              bloodTypeNeeded: data["blood_type_needed"],
+              unitsNeeded: data["units_needed"],
+              createdAt: data["created_at"],
+              expiresAt: data["expires_at"],
+              token: widget.token,
+            ),
+          ),
         );
-        if (matchRes.statusCode == 200) {
-          final matchData = jsonDecode(matchRes.body);
-          setState(() {
-            matches = matchData["matches"] ?? [];
-            hospitalLat = matchData["hospital_location"]?["latitude"];
-            hospitalLng = matchData["hospital_location"]?["longitude"];
-          });
-          _fetchResponses();
-        }
       } else {
         _showSnack("Failed to create request: ${res.body}");
       }
     } catch (e) {
-      _showSnack("Error finding donors: $e");
+      _showSnack("Error: $e");
     } finally {
-      setState(() => isSearching = false);
+      setState(() => isSubmitting = false);
     }
-  }
-
-  Future<void> _respond(String donorId, String status) async {
-    if (currentRequestId == null) return;
-    try {
-      final res = await http.post(
-        Uri.parse("$baseUrl/blood-requests/$currentRequestId/respond"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer ${widget.token}",
-        },
-        body: jsonEncode({"donor_id": donorId, "status": status}),
-      );
-      if (res.statusCode == 201) {
-        setState(() => responsesState[donorId] = status);
-      } else {
-        _showSnack("Failed to submit response: ${res.body}");
-      }
-    } catch (e) {
-      _showSnack("Error connecting to server: $e");
-    }
-  }
-
-  Future<void> _fetchResponses() async {
-    if (currentRequestId == null) return;
-    try {
-      final res = await http.get(
-        Uri.parse("$baseUrl/blood-requests/$currentRequestId/responses"),
-      );
-      if (res.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(res.body);
-        final updated = <String, String>{};
-        for (var item in data) {
-          updated[item["donor_id"]] = item["status"];
-        }
-        setState(() => responsesState = updated);
-      }
-    } catch (_) {}
   }
 
   void _showSnack(String msg) {
@@ -851,25 +798,21 @@ class _RequestScreenState extends State<RequestScreen> {
                 const LabeledField(label: "Hospital name"),
                 Autocomplete<String>(
                   optionsBuilder: (TextEditingValue textEditingValue) {
-                    if (textEditingValue.text.isEmpty) {
+                    if (textEditingValue.text.isEmpty)
                       return const Iterable<String>.empty();
-                    }
                     return kKnownHospitals.where(
                       (h) => h.toLowerCase().contains(
                         textEditingValue.text.toLowerCase(),
                       ),
                     );
                   },
-                  onSelected: (String selection) {
-                    hospitalCtrl.text = selection;
-                  },
+                  onSelected: (String selection) =>
+                      hospitalCtrl.text = selection,
                   fieldViewBuilder:
                       (context, controller, focusNode, onFieldSubmitted) {
-                        // Keep our own controller in sync so free typing (not just selecting
-                        // a suggestion) still updates hospitalCtrl for submission.
-                        controller.addListener(() {
-                          hospitalCtrl.text = controller.text;
-                        });
+                        controller.addListener(
+                          () => hospitalCtrl.text = controller.text,
+                        );
                         return TextField(
                           controller: controller,
                           focusNode: focusNode,
@@ -939,6 +882,28 @@ class _RequestScreenState extends State<RequestScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                const LabeledField(label: "Urgency"),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text("Critical (6h)"),
+                      selected: urgency == "critical",
+                      onSelected: (_) => setState(() => urgency = "critical"),
+                    ),
+                    ChoiceChip(
+                      label: const Text("Urgent (24h)"),
+                      selected: urgency == "urgent",
+                      onSelected: (_) => setState(() => urgency = "urgent"),
+                    ),
+                    ChoiceChip(
+                      label: const Text("Planned (72h)"),
+                      selected: urgency == "planned",
+                      onSelected: (_) => setState(() => urgency = "planned"),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -947,8 +912,8 @@ class _RequestScreenState extends State<RequestScreen> {
                       backgroundColor: scheme.primary,
                       foregroundColor: Colors.white,
                     ),
-                    onPressed: isSearching ? null : _submitRequest,
-                    icon: isSearching
+                    onPressed: isSubmitting ? null : _submitRequest,
+                    icon: isSubmitting
                         ? const SizedBox(
                             width: 18,
                             height: 18,
@@ -959,194 +924,326 @@ class _RequestScreenState extends State<RequestScreen> {
                           )
                         : const Icon(Icons.search),
                     label: Text(
-                      isSearching ? "Searching..." : "Find Donors Near Me",
+                      isSubmitting
+                          ? "Posting..."
+                          : "Post Request & Find Donors",
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          if (currentRequestId != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.shade200),
-              ),
-              child: Row(
+        ],
+      ),
+    );
+  }
+}
+
+class RequestResultsScreen extends StatefulWidget {
+  final String requestId;
+  final String hospitalName;
+  final String bloodTypeNeeded;
+  final int unitsNeeded;
+  final String createdAt;
+  final String? expiresAt;
+  final String token;
+
+  const RequestResultsScreen({
+    super.key,
+    required this.requestId,
+    required this.hospitalName,
+    required this.bloodTypeNeeded,
+    required this.unitsNeeded,
+    required this.createdAt,
+    required this.expiresAt,
+    required this.token,
+  });
+
+  @override
+  State<RequestResultsScreen> createState() => _RequestResultsScreenState();
+}
+
+class _RequestResultsScreenState extends State<RequestResultsScreen> {
+  List<dynamic> matches = [];
+  Map<String, String> responsesState = {};
+  double? hospitalLat;
+  double? hospitalLng;
+  bool isLoading = true;
+  String status = "open";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMatches();
+  }
+
+  Future<void> _loadMatches() async {
+    setState(() => isLoading = true);
+    try {
+      final matchRes = await http.get(
+        Uri.parse("$baseUrl/blood-requests/${widget.requestId}/matches"),
+      );
+      if (matchRes.statusCode == 200) {
+        final data = jsonDecode(matchRes.body);
+        setState(() {
+          matches = data["matches"] ?? [];
+          status = data["status"] ?? "open";
+          hospitalLat = data["hospital_location"]?["latitude"];
+          hospitalLng = data["hospital_location"]?["longitude"];
+        });
+      }
+      await _fetchResponses();
+    } catch (_) {
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _fetchResponses() async {
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/blood-requests/${widget.requestId}/responses"),
+      );
+      if (res.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(res.body);
+        final updated = <String, String>{};
+        for (var item in data) {
+          updated[item["donor_id"]] = item["status"];
+        }
+        setState(() => responsesState = updated);
+      }
+    } catch (_) {}
+  }
+
+  String _referenceCode() => widget.requestId.substring(0, 8).toUpperCase();
+
+  String _timeAgo(String iso) {
+    final posted = DateTime.tryParse(iso);
+    if (posted == null) return "";
+    final diff = DateTime.now().toUtc().difference(posted.toUtc());
+    if (diff.inMinutes < 1) return "just now";
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
+    if (diff.inHours < 24) return "${diff.inHours}h ago";
+    return "${diff.inDays}d ago";
+  }
+
+  String _expiresIn() {
+    if (widget.expiresAt == null) return "";
+    final exp = DateTime.tryParse(widget.expiresAt!);
+    if (exp == null) return "";
+    final diff = exp.toUtc().difference(DateTime.now().toUtc());
+    if (diff.isNegative) return "Expired";
+    if (diff.inHours < 1) return "Expires in ${diff.inMinutes}m";
+    return "Expires in ${diff.inHours}h";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Request Results")),
+      body: RefreshIndicator(
+        onRefresh: _loadMatches,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            SectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    color: Colors.amber.shade800,
-                    size: 18,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.hospitalName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              "${widget.bloodTypeNeeded} · ${widget.unitsNeeded} unit(s) · Ref #${_referenceCode()}",
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Chip(
+                        label: Text(
+                          status.toUpperCase(),
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                        backgroundColor: status == "open"
+                            ? Colors.green.shade50
+                            : Colors.grey.shade200,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      "Demo mode: tap accept/decline to simulate a donor responding.",
-                      style: TextStyle(fontSize: 12),
-                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Posted ${_timeAgo(widget.createdAt)} · ${_expiresIn()}",
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
                   ),
                 ],
               ),
             ),
-          ],
-          if (hospitalLat != null && hospitalLng != null) ...[
             const SizedBox(height: 16),
-            SizedBox(
-              height: 220,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: LatLng(hospitalLat!, hospitalLng!),
-                    initialZoom: 12,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.mobile',
-                    ),
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: LatLng(hospitalLat!, hospitalLng!),
-                          width: 40,
-                          height: 40,
-                          child: const Icon(
-                            Icons.local_hospital,
-                            color: Colors.red,
-                            size: 32,
-                          ),
-                        ),
-                        ...matches.map(
-                          (donor) => Marker(
-                            point: LatLng(
-                              donor["latitude"],
-                              donor["longitude"],
-                            ),
-                            width: 36,
-                            height: 36,
-                            child: Icon(
-                              Icons.bloodtype,
-                              color: Colors.blue.shade700,
-                              size: 28,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+
+            if (isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(),
                 ),
               ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          if (!hasSearched)
-            _EmptyState(
-              icon: Icons.bloodtype_outlined,
-              text: "Enter request details above and search for nearby donors.",
-            )
-          else if (matches.isEmpty && !isSearching)
-            _EmptyState(
-              icon: Icons.search_off,
-              text: "No eligible donors found nearby.",
-            )
-          else
-            ...matches.map((donor) {
-              final donorId = donor["id"];
-              final status = responsesState[donorId];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: scheme.primary.withValues(
-                            alpha: 0.1,
-                          ),
-                          child: Text(
-                            donor["blood_type"] ?? "?",
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: scheme.primary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                donor["full_name"] ?? "Anonymous Donor",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                "${donor['distance_km']} km away · ${donor['phone_number']}",
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (status != null)
-                          Chip(
-                            avatar: Icon(
-                              status == "accepted"
-                                  ? Icons.check_circle
-                                  : Icons.cancel,
-                              color: status == "accepted"
-                                  ? Colors.green
-                                  : Colors.red,
-                              size: 16,
-                            ),
-                            label: Text(
-                              status.toUpperCase(),
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                            backgroundColor: Colors.grey.shade100,
-                            side: BorderSide.none,
-                          )
-                        else
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                ),
-                                onPressed: () => _respond(donorId, "accepted"),
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.cancel,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () => _respond(donorId, "declined"),
-                              ),
-                            ],
-                          ),
-                      ],
+
+            if (!isLoading && hospitalLat != null && hospitalLng != null)
+              SizedBox(
+                height: 220,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: LatLng(hospitalLat!, hospitalLng!),
+                      initialZoom: 12,
                     ),
+                    children: [
+                      TileLayer(
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.mobile',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: LatLng(hospitalLat!, hospitalLng!),
+                            width: 40,
+                            height: 40,
+                            child: const Icon(
+                              Icons.local_hospital,
+                              color: Colors.red,
+                              size: 32,
+                            ),
+                          ),
+                          ...matches.map(
+                            (donor) => Marker(
+                              point: LatLng(
+                                donor["latitude"],
+                                donor["longitude"],
+                              ),
+                              width: 36,
+                              height: 36,
+                              child: Icon(
+                                Icons.bloodtype,
+                                color: Colors.blue.shade700,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              );
-            }),
-        ],
+              ),
+
+            const SizedBox(height: 16),
+
+            if (!isLoading && matches.isEmpty)
+              _EmptyState(
+                icon: Icons.search_off,
+                text:
+                    "No eligible donors found nearby yet. Pull down to refresh.",
+              )
+            else if (!isLoading)
+              ...matches.map((donor) {
+                final donorId = donor["id"];
+                final respStatus = responsesState[donorId];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: scheme.primary.withValues(
+                              alpha: 0.1,
+                            ),
+                            child: Text(
+                              donor["blood_type"] ?? "?",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: scheme.primary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  donor["full_name"] ?? "Anonymous Donor",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  "${donor['distance_km']} km away · ${donor['phone_number']}",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (respStatus != null)
+                            Chip(
+                              avatar: Icon(
+                                respStatus == "accepted"
+                                    ? Icons.check_circle
+                                    : Icons.cancel,
+                                color: respStatus == "accepted"
+                                    ? Colors.green
+                                    : Colors.red,
+                                size: 16,
+                              ),
+                              label: Text(
+                                respStatus.toUpperCase(),
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                              backgroundColor: Colors.grey.shade100,
+                              side: BorderSide.none,
+                            )
+                          else
+                            Text(
+                              "Awaiting response",
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 11,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }
