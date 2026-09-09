@@ -24,6 +24,7 @@ class BloodRequestOut(BaseModel):
     urgency: str
     status: str
     created_at: datetime
+    expires_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
