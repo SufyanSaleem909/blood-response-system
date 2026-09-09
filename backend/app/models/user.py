@@ -4,6 +4,7 @@ from datetime import date, datetime
 from sqlalchemy import Column, String, Boolean, Date, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID
 from geoalchemy2 import Geography
+import sqlalchemy as sa
 
 from app.db.session import Base
 
@@ -20,3 +21,4 @@ class User(Base):
     location = Column(Geography(geometry_type="POINT", srid=4326), nullable=True)
     fcm_token = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_banned = Column(Boolean, default=False, server_default=sa.false(), nullable=False)
