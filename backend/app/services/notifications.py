@@ -44,6 +44,7 @@ def send_response_notification(fcm_token: str, donor_name: str, hospital_name: s
         token=fcm_token,
     )
     try:
+        print(f"Sending notification to token ending in ...{fcm_token[-10:]}")
         messaging.send(message)
     except Exception as e:
         print(f"Failed to send response notification: {e}")

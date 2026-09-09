@@ -1,9 +1,11 @@
+from datetime import date
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
+from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
 
 from app.api.deps import get_current_user
 from app.core.security import create_access_token
@@ -57,6 +59,17 @@ def update_availability(
     current_user: User = Depends(get_current_user),
 ):
     current_user.is_donor_available = payload.is_donor_available
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/mark-donated", response_model=UserOut)
+def mark_donated(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    current_user.last_donation_date = date.today()
     db.commit()
     db.refresh(current_user)
     return current_user

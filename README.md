@@ -81,6 +81,11 @@ API docs available at `http://127.0.0.1:8000/docs` once the backend is running.
       own request/response history.
 - [x] OTP security hardening — resend cooldown, max verification attempts,
       and automatic invalidation of previous codes when a new one is issued.
+- [x] Donor donation confirmation — donors can mark "I donated" after
+      accepting, correctly restarting their 90-day eligibility window.
+- [x] Request expiry — requests automatically expire based on urgency
+      (critical: 6h, urgent: 24h, planned: 72h) and are excluded from
+      matching once expired.
 
 ## Roadmap
 
