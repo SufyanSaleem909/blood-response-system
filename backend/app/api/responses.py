@@ -9,6 +9,7 @@ from app.models.response import Response
 from app.models.user import User as UserModel
 from app.schemas.response import ResponseCreate, ResponseOut
 from app.services.notifications import send_response_notification
+from app.schemas.response import ResponseCreate, ResponseOut, StatusMessageUpdate
 
 router = APIRouter(prefix="/blood-requests", tags=["responses"])
 
@@ -92,3 +93,27 @@ def list_responses(request_id: str, db: Session = Depends(get_db)):
         .all()
     )
     return responses
+
+@router.patch("/{request_id}/respond/status-message", response_model=ResponseOut)
+def update_status_message(
+    request_id: str,
+    payload: StatusMessageUpdate,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    response = db.execute(
+        select(Response).where(
+            Response.request_id == request_id,
+            Response.donor_id == current_user.id,
+        )
+    ).scalar_one_or_none()
+
+    if not response:
+        raise HTTPException(status_code=404, detail="No response found for this donor on this request")
+    if response.status != "accepted":
+        raise HTTPException(status_code=400, detail="Can only set a status message after accepting")
+
+    response.status_message = payload.status_message
+    db.commit()
+    db.refresh(response)
+    return response

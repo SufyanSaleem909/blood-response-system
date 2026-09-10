@@ -14,3 +14,5 @@ class Response(Base):
     donor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     status = Column(String(20), default="pending", nullable=False)  # pending/accepted/declined/arrived
     responded_at = Column(DateTime(timezone=True), server_default=func.now())
+    status_message = Column(String, nullable=True)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
