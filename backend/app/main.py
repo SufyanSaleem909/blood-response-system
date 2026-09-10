@@ -6,6 +6,8 @@ from app.db.session import get_db
 from app.api import users, blood_requests
 from app.api import users, blood_requests, responses
 from app.api import users, blood_requests, responses, auth
+from app.api import users, blood_requests, responses, auth, reports
+
 
 app = FastAPI(title="Blood Response System API")
 
@@ -13,6 +15,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(blood_requests.router)
 app.include_router(responses.router)
+app.include_router(reports.router)
 
 @app.get("/health")
 def health_check():
