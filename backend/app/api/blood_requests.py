@@ -187,6 +187,7 @@ def nearby_requests_for_donor(
         WHERE br.status = 'open'
           AND (br.expires_at IS NULL OR br.expires_at > NOW())
           AND br.requester_id != :donor_id
+          AND requester.is_banned = FALSE
           AND br.blood_type_needed = ANY(:compatible_needed_types)
           AND ST_DWithin(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
         ORDER BY distance_km ASC
@@ -247,6 +248,7 @@ def get_matches(request_id: str, radius_km: int = 10, db: Session = Depends(get_
         WHERE id != :requester_id
           AND blood_type = ANY(:compatible_types)
           AND is_donor_available = TRUE
+          AND is_banned = FALSE
           AND ST_DWithin(location::geography, (SELECT location::geography FROM blood_requests WHERE id = :req_id), :radius_m)
         ORDER BY distance_km ASC
         LIMIT 50
