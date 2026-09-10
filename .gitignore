@@ -10,3 +10,4 @@ mobile/.dart_tool/
 *.egg-info/
 EOF
 firebase-credentials.json.vscode/
+backend/firebase-credentials.json
