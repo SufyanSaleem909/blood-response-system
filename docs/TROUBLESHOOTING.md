@@ -45,3 +45,12 @@ psycopg2/SQLAlchemy can't serialize that Python object back into SQL. Instead,
 fetch/pass plain `latitude`/`longitude` floats and reconstruct the point inside
 the query with `ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography`, matching
 the pattern used elsewhere (create_blood_request, get_matches).
+
+## Adding a NOT NULL column to a table with existing rows
+
+Alembic's autogenerate will happily generate `ALTER TABLE ... ADD COLUMN
+... NOT NULL` for a new required field, but this fails if the table
+already has rows, since Postgres can't backfill them with NULL. Fix:
+add `server_default=sa.false()` (or the appropriate default) to the
+`op.add_column(...)` call so existing rows get a real default value
+instead of NULL.
