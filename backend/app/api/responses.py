@@ -7,7 +7,6 @@ from app.db.session import get_db
 from app.models.blood_request import BloodRequest
 from app.models.response import Response
 from app.models.user import User as UserModel
-from app.schemas.response import ResponseCreate, ResponseOut
 from app.services.notifications import send_response_notification
 from app.schemas.response import ResponseCreate, ResponseOut, StatusMessageUpdate
 
@@ -39,6 +38,9 @@ def respond_to_request(
     req = db.get(BloodRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Blood request not found")
+
+    if req.status != "open":
+        raise HTTPException(status_code=400, detail=f"This request is no longer open (status: {req.status})")
 
     donor = db.get(UserModel, payload.donor_id)
     if not donor:

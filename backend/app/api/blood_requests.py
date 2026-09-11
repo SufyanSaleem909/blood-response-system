@@ -82,14 +82,15 @@ def create_blood_request(
 
     compatible_types = COMPATIBLE_DONORS.get(payload.blood_type_needed, [])
     query = text("""
-        SELECT fcm_token, last_donation_date,
-               ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) / 1000 AS distance_km
-        FROM users
-        WHERE id != :requester_id
-          AND blood_type = ANY(:compatible_types)
-          AND is_donor_available = TRUE
-          AND ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, 10000)
-    """)
+    SELECT fcm_token, last_donation_date,
+           ST_Distance(location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) / 1000 AS distance_km
+    FROM users
+    WHERE id != :requester_id
+      AND blood_type = ANY(:compatible_types)
+      AND is_donor_available = TRUE
+      AND is_banned = FALSE
+      AND ST_DWithin(location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, 10000)
+""")
     rows = db.execute(
         query,
         {
