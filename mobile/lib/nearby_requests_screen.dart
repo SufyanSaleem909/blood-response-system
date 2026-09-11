@@ -55,9 +55,56 @@ class _NearbyRequestsScreenState extends State<NearbyRequestsScreen> {
     if (res.statusCode == 201) {
       _load();
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Response recorded: $status")));
+        if (status == "accepted") {
+          _promptStatusMessage(requestId);
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text("Response recorded: $status")));
+        }
+      }
+    }
+  }
+
+  Future<void> _promptStatusMessage(String requestId) async {
+    final controller = TextEditingController(text: "On my way, ETA 20 minutes");
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Let them know you're coming"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "e.g. On my way, ETA 20 minutes",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Skip"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text("Send"),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      final patchRes = await http.patch(
+        Uri.parse("$baseUrl/blood-requests/$requestId/respond/status-message"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer ${widget.token}",
+        },
+        body: jsonEncode({"status_message": result}),
+      );
+
+      if (mounted && patchRes.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Status sent to requester.")),
+        );
       }
     }
   }

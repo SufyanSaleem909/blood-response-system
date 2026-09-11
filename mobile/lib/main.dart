@@ -965,7 +965,7 @@ class RequestResultsScreen extends StatefulWidget {
 
 class _RequestResultsScreenState extends State<RequestResultsScreen> {
   List<dynamic> matches = [];
-  Map<String, String> responsesState = {};
+  Map<String, Map<String, dynamic>> responsesState = {};
   double? hospitalLat;
   double? hospitalLng;
   bool isLoading = true;
@@ -1006,9 +1006,12 @@ class _RequestResultsScreenState extends State<RequestResultsScreen> {
       );
       if (res.statusCode == 200) {
         final List<dynamic> data = jsonDecode(res.body);
-        final updated = <String, String>{};
+        final updated = <String, Map<String, dynamic>>{};
         for (var item in data) {
-          updated[item["donor_id"]] = item["status"];
+          updated[item["donor_id"]] = {
+            "status": item["status"],
+            "status_message": item["status_message"],
+          };
         }
         setState(() => responsesState = updated);
       }
@@ -1048,51 +1051,57 @@ class _RequestResultsScreenState extends State<RequestResultsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            SectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.hospitalName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 16,
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.hospitalName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
                               ),
-                            ),
-                            Text(
-                              "${widget.bloodTypeNeeded} · ${widget.unitsNeeded} unit(s) · Ref #${_referenceCode()}",
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
+                              Text(
+                                "${widget.bloodTypeNeeded} · ${widget.unitsNeeded} unit(s) · Ref #${_referenceCode()}",
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 12,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                      Chip(
-                        label: Text(
-                          status.toUpperCase(),
-                          style: const TextStyle(fontSize: 10),
+                        Chip(
+                          label: Text(
+                            status.toUpperCase(),
+                            style: const TextStyle(fontSize: 10),
+                          ),
+                          backgroundColor: status == "open"
+                              ? Colors.green.shade50
+                              : Colors.grey.shade200,
                         ),
-                        backgroundColor: status == "open"
-                            ? Colors.green.shade50
-                            : Colors.grey.shade200,
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Posted ${_timeAgo(widget.createdAt)} · ${_expiresIn()}",
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 11,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Posted ${_timeAgo(widget.createdAt)} · ${_expiresIn()}",
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -1158,84 +1167,130 @@ class _RequestResultsScreenState extends State<RequestResultsScreen> {
             const SizedBox(height: 16),
 
             if (!isLoading && matches.isEmpty)
-              _EmptyState(
-                icon: Icons.search_off,
-                text:
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
                     "No eligible donors found nearby yet. Pull down to refresh.",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
               )
             else if (!isLoading)
               ...matches.map((donor) {
                 final donorId = donor["id"];
-                final respStatus = responsesState[donorId];
+                final response = responsesState[donorId];
+                final respStatus = response?["status"];
+                final statusMessage = response?["status_message"];
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Card(
                     child: Padding(
                       padding: const EdgeInsets.all(14),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: scheme.primary.withValues(
-                              alpha: 0.1,
-                            ),
-                            child: Text(
-                              donor["blood_type"] ?? "?",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: scheme.primary,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  donor["full_name"] ?? "Anonymous Donor",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: scheme.primary.withValues(
+                                  alpha: 0.1,
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  "${donor['distance_km']} km away · ${donor['phone_number']}",
+                                child: Text(
+                                  donor["blood_type"] ?? "?",
                                   style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.primary,
+                                    fontSize: 13,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      donor["full_name"] ?? "Anonymous Donor",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      "${donor['distance_km']} km away · ${donor['phone_number']}",
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (respStatus != null)
+                                Chip(
+                                  avatar: Icon(
+                                    respStatus == "accepted"
+                                        ? Icons.check_circle
+                                        : Icons.cancel,
+                                    color: respStatus == "accepted"
+                                        ? Colors.green
+                                        : Colors.red,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    respStatus.toString().toUpperCase(),
+                                    style: const TextStyle(fontSize: 10),
+                                  ),
+                                  backgroundColor: Colors.grey.shade100,
+                                  side: BorderSide.none,
+                                )
+                              else
+                                Text(
+                                  "Awaiting response",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade400,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                            ],
                           ),
-                          if (respStatus != null)
-                            Chip(
-                              avatar: Icon(
-                                respStatus == "accepted"
-                                    ? Icons.check_circle
-                                    : Icons.cancel,
-                                color: respStatus == "accepted"
-                                    ? Colors.green
-                                    : Colors.red,
-                                size: 16,
+                          if (respStatus == "accepted" &&
+                              statusMessage != null &&
+                              statusMessage.toString().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
                               ),
-                              label: Text(
-                                respStatus.toUpperCase(),
-                                style: const TextStyle(fontSize: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              backgroundColor: Colors.grey.shade100,
-                              side: BorderSide.none,
-                            )
-                          else
-                            Text(
-                              "Awaiting response",
-                              style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: 11,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.directions_run,
+                                    size: 15,
+                                    color: Colors.green.shade700,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      statusMessage.toString(),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.green.shade800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ],
                         ],
                       ),
                     ),
