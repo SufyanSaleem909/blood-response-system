@@ -176,23 +176,24 @@ def nearby_requests_for_donor(
         return {"requests": []}
 
     query = text("""
-        SELECT br.id, br.blood_type_needed, br.units_needed, br.hospital_name,
-               br.urgency, br.status, br.created_at, br.expires_at,
-               ST_Distance(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) / 1000 AS distance_km,
-               EXISTS (
-                   SELECT 1 FROM responses r
-                   WHERE r.request_id = br.id AND r.donor_id = :donor_id
-               ) AS already_responded
-        FROM blood_requests br
-        WHERE br.status = 'open'
-          AND (br.expires_at IS NULL OR br.expires_at > NOW())
-          AND br.requester_id != :donor_id
-          AND requester.is_banned = FALSE
-          AND br.blood_type_needed = ANY(:compatible_needed_types)
-          AND ST_DWithin(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
-        ORDER BY distance_km ASC
-        LIMIT 50
-    """)
+    SELECT br.id, br.blood_type_needed, br.units_needed, br.hospital_name,
+           br.urgency, br.status, br.created_at, br.expires_at,
+           ST_Distance(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography) / 1000 AS distance_km,
+           EXISTS (
+               SELECT 1 FROM responses r
+               WHERE r.request_id = br.id AND r.donor_id = :donor_id
+           ) AS already_responded
+    FROM blood_requests br
+    JOIN users requester ON requester.id = br.requester_id
+    WHERE br.status = 'open'
+      AND (br.expires_at IS NULL OR br.expires_at > NOW())
+      AND br.requester_id != :donor_id
+      AND requester.is_banned = FALSE
+      AND br.blood_type_needed = ANY(:compatible_needed_types)
+      AND ST_DWithin(br.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, :radius_m)
+    ORDER BY distance_km ASC
+    LIMIT 50
+""")
 
     rows = db.execute(query, {
         "donor_id": current_user.id,
