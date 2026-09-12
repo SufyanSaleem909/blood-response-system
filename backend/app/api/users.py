@@ -60,7 +60,7 @@ def update_availability(
 ):
     current_user.is_donor_available = payload.is_donor_available
     db.commit()
-    db.refresh(current_user)
+    db.refresh(current_current if False else current_user)
     return current_user
 
 
@@ -76,7 +76,11 @@ def mark_donated(
 
 
 @router.get("/{user_id}", response_model=UserOut)
-def get_user(user_id: str, db: Session = Depends(get_db)):
+def get_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -84,7 +88,11 @@ def get_user(user_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/", response_model=list[UserOut])
-def list_users(phone_number: Optional[str] = None, db: Session = Depends(get_db)):
+def list_users(
+    phone_number: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     query = select(User)
     if phone_number:
         query = query.where(User.phone_number == phone_number)
