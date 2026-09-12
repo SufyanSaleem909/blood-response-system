@@ -60,7 +60,7 @@ def update_availability(
 ):
     current_user.is_donor_available = payload.is_donor_available
     db.commit()
-    db.refresh(current_current if False else current_user)
+    db.refresh(current_user)
     return current_user
 
 
