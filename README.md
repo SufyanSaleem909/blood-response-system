@@ -60,42 +60,27 @@ flutter run
 
 API docs available at `http://127.0.0.1:8000/docs` once the backend is running.
 
-## Current status (MVP)
+## Current status (feature-complete MVP)
 
-- [x] Donor registration with blood type and location
-- [x] Urgent blood request creation
-- [x] Nearby-donor matching (blood type compatibility + 90-day eligibility + radius search)
-- [x] Push notifications (Firebase Cloud Messaging) to matched donors
-- [x] Donor accept/decline response tracking
-- [x] Phone-based OTP authentication (JWT) — protects request creation and
-      donor responses so users can't act on behalf of others. OTP delivery
-      logs to the backend console in dev mode (no paid SMS provider wired up).
-- [x] Minimal, polished Flutter UI for the full flow above
-- [x] Two-way notifications: donors are notified of matching requests,
-      and requesters are notified the moment a donor accepts.
-- [x] Donor availability toggle — donors can pause/resume matching without
-      deleting their account, addressing the "is my donation actually
-      needed right now" problem from the original user research.
-- [x] Request lifecycle management — requesters can mark requests as
-      fulfilled/cancelled; both requesters and donors can view their
-      own request/response history.
-- [x] OTP security hardening — resend cooldown, max verification attempts,
-      and automatic invalidation of previous codes when a new one is issued.
-- [x] Donor donation confirmation — donors can mark "I donated" after
-      accepting, correctly restarting their 90-day eligibility window.
-- [x] Request expiry — requests automatically expire based on urgency
-      (critical: 6h, urgent: 24h, planned: 72h) and are excluded from
-      matching once expired.
+- [x] Phone OTP authentication (JWT) with rate limiting, attempt lockouts, single-active-code invalidation
+- [x] Donor registration with blood type, location, and availability toggle
+- [x] Urgent blood request creation with urgency-based auto-expiry (critical: 6h, urgent: 24h, planned: 72h)
+- [x] Geospatial donor matching (PostGIS) with blood-type compatibility and 90-day eligibility rules
+- [x] Donor-initiated browsing of nearby open requests
+- [x] Bidirectional push notifications (FCM) — donor on match, requester on acceptance — working across foreground, background, and killed app states with deep-linking
+- [x] Donor accept/decline response tracking, plus optional "on my way" status messages
+- [x] Donor "I donated" confirmation, correctly resetting the 90-day eligibility window
+- [x] Request lifecycle management (fulfilled/cancelled) and full requester/donor activity history
+- [x] User reporting and admin ban system, enforced across auth, matching, and notifications
+- [x] Hospital name autocomplete, map view of hospital + matched donors, custom app icon/splash
+- [x] Unit tests, GitHub Actions CI
 
 ## Roadmap
 
-- [ ] Push notifications (Firebase Cloud Messaging) instead of manual refresh
-- [ ] Phone-based OTP authentication
-- [ ] Donor accept/decline response tracking
-- [ ] Automated tests + CI (GitHub Actions)
-- [ ] Deployed live demo (Railway/Render)
-- [ ] Polished UI, app icon, onboarding
-- [ ] App store / Play Store submission
+- [ ] Live deployment (pending a free-tier host that doesn't require payment details)
+- [ ] Real SMS provider for OTP delivery (currently logs to backend console in dev mode)
+- [ ] In-app chat (currently solved via direct phone number sharing between matched users)
+- [ ] Government ID verification (would require a paid NADRA-equivalent integration)
 
 ## Notes on data sensitivity
 
